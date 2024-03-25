@@ -1,0 +1,10 @@
+{
+  "name": "webgains-tag",
+  "version": "1.0.0",
+  "description": "Webgains Tag for SGTM",
+  "author": "Stape",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "prettier": "^3.2.5"
+  }
+}
