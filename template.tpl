@@ -62,6 +62,14 @@ ___TEMPLATE_PARAMETERS___
           }
         ],
         "defaultValue": "cid"
+      },
+      {
+        "type": "CHECKBOX",
+        "name": "cookieHttpOnly",
+        "checkboxText": "HttpOnly cookie",
+        "simpleValueType": true,
+        "defaultValue": true,
+        "help": "May lead to compatibility issues when GTM working in sandbox. For example in Shopify checkout page."
       }
     ],
     "enablingConditions": [
@@ -270,6 +278,7 @@ const isLoggingEnabled = determinateIsLoggingEnabled();
 const traceId = getRequestHeader('trace-id');
 
 const eventData = getAllEventData();
+const httpOnly = data.cookieHttpOnly;
 
 switch (data.type) {
   case 'page_view':
@@ -292,7 +301,7 @@ function handlePageViewEvent() {
         domain: 'auto',
         path: '/',
         secure: true,
-        httpOnly: true,
+        httpOnly: httpOnly,
         'max-age': 7776000 // 90 days
       };
       setCookie('wg_cid', searchParams[cidParamName], options, false);

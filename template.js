@@ -14,6 +14,7 @@ const isLoggingEnabled = determinateIsLoggingEnabled();
 const traceId = getRequestHeader('trace-id');
 
 const eventData = getAllEventData();
+const httpOnly = data.cookieHttpOnly;
 
 switch (data.type) {
   case 'page_view':
@@ -36,7 +37,7 @@ function handlePageViewEvent() {
         domain: 'auto',
         path: '/',
         secure: true,
-        httpOnly: true,
+        httpOnly: httpOnly,
         'max-age': 7776000 // 90 days
       };
       setCookie('wg_cid', searchParams[cidParamName], options, false);
