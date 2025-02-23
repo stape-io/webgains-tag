@@ -1,4 +1,4 @@
-___TERMS_OF_SERVICE___
+﻿___TERMS_OF_SERVICE___
 
 By creating or modifying this file you agree to Google Tag Manager's Community
 Template Gallery Developer Terms of Service available at
@@ -311,8 +311,11 @@ function handlePageViewEvent() {
 }
 
 function handleConversionEvent() {
-  const clickId = data.clickId || getCookieValues('wg_cid')[0];
+  const commonCookie = eventData.common_cookie || {};
+  const clickId = data.clickId || getCookieValues('wg_cid')[0] || commonCookie.wg_cid;
+  
   if (!clickId) return data.gtmOnSuccess();
+  
   const payload = getRequestPayload(clickId);
   const requestUrl = 'https://api.webgains.io/queue-conversion';
   if (isLoggingEnabled) {
@@ -710,5 +713,3 @@ scenarios: []
 ___NOTES___
 
 Created on 25/03/2024, 15:44:08
-
-
