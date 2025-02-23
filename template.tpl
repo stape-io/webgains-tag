@@ -151,9 +151,9 @@ ___TEMPLATE_PARAMETERS___
           {
             "type": "TEXT",
             "name": "clickId",
-            "displayName": "Click id",
+            "displayName": "Click ID",
             "simpleValueType": true,
-            "help": "Value of the identifier. This value must be the click ID assigned to the user.\n\u003cbr/\u003e\nDefault: cid param previously saved to \u003cb\u003ewg_cid\u003c/b\u003e cookie."
+            "help": "Value of the identifier. This value must be the Click ID assigned to the user.\n<br/>\nDefault: <b>cid</b> URL param value previously saved to <b>wg_cid</b> cookie, with fallback to <b>common_cookie.wg_cid</b> in the Event Data object passed to Stape's Data Tag."
           },
           {
             "type": "TEXT",
@@ -311,8 +311,11 @@ function handlePageViewEvent() {
 }
 
 function handleConversionEvent() {
-  const clickId = data.clickId || getCookieValues('wg_cid')[0];
+  const commonCookie = eventData.common_cookie || {};
+  const clickId = data.clickId || getCookieValues('wg_cid')[0] || commonCookie.wg_cid;
+  
   if (!clickId) return data.gtmOnSuccess();
+  
   const payload = getRequestPayload(clickId);
   const requestUrl = 'https://api.webgains.io/queue-conversion';
   if (isLoggingEnabled) {
@@ -710,5 +713,3 @@ scenarios: []
 ___NOTES___
 
 Created on 25/03/2024, 15:44:08
-
-

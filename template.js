@@ -47,8 +47,11 @@ function handlePageViewEvent() {
 }
 
 function handleConversionEvent() {
-  const clickId = data.clickId || getCookieValues('wg_cid')[0];
+  const commonCookie = eventData.common_cookie || {};
+  const clickId = data.clickId || getCookieValues('wg_cid')[0] || commonCookie.wg_cid;
+  
   if (!clickId) return data.gtmOnSuccess();
+  
   const payload = getRequestPayload(clickId);
   const requestUrl = 'https://api.webgains.io/queue-conversion';
   if (isLoggingEnabled) {
@@ -137,7 +140,7 @@ function getItems() {
     price: item[itemFields.price || 'price'] || 0,
     name: item[itemFields.name || 'item_name'] || '',
     code: item[itemFields.code || 'item_id'] || '',
-    voucher: item[itemFields.voucher || 'coupon'] || ''
+    voucher: item[itemFields.voucher || 'voucher'] || ''
   }));
 }
 
