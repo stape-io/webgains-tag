@@ -2,10 +2,10 @@
 
 There are two types of events that Webgains tag supports: PageView and Conversion. 
 
-- **PageView event** stores the cid URL parameter inside the wg_cid cookie. 
+- **PageView event** stores the cid URL parameter inside the `wg_cid` cookie. 
 - **Conversion event** sends the HTTP request with the specified conversion data to Webgains.
 
-## How to use the Webgains tag:
+## How to use the Webgains tag
 
 1. Create a Webgains tag and add Page View and Purchase triggers
 2. Add the only required field for the conversion event - Program ID, other fields are optional.
@@ -14,7 +14,7 @@ There are two types of events that Webgains tag supports: PageView and Conversio
 
 **Order Reference** - Unique ID that identifies the order or transaction on your site.
 
-**Event ID** - Event id.
+**Event ID** - Event ID.
 
 **Currency** - Transaction currency.
 
@@ -24,14 +24,13 @@ There are two types of events that Webgains tag supports: PageView and Conversio
 
 **Location** - Checkout URL. May remain empty.
 
-**Click id** - Value of the identifier. This value must be the click ID assigned to the user.
+**Click ID** - Value of the identifier. This value must be the Click ID assigned to the user.
 
 **Comment** - Optional commentary.
 
 **Items** - Array with the articles of the transaction.
 
 **Item Fields** - Array with the fields of the articles.
-
 
 ## Open Source
 
