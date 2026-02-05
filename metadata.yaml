@@ -1,4 +1,5 @@
 homepage: 'https://stape.io/'
+documentation: 'https://github.com/stape-io/webgains-tag'
 versions:
   - sha: a718dd69c2c238a2b528f235693de0d182326e02
     changeNotes: Add consent section.
