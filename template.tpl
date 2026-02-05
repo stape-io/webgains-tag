@@ -1,4 +1,4 @@
-___TERMS_OF_SERVICE___
+﻿___TERMS_OF_SERVICE___
 
 By creating or modifying this file you agree to Google Tag Manager's Community
 Template Gallery Developer Terms of Service available at
@@ -153,7 +153,7 @@ ___TEMPLATE_PARAMETERS___
             "name": "clickId",
             "displayName": "Click ID",
             "simpleValueType": true,
-            "help": "Value of the identifier. This value must be the Click ID assigned to the user.\n<br/>\nDefault: <b>cid</b> URL param value previously saved to <b>wg_cid</b> cookie, with fallback to <b>common_cookie.wg_cid</b> in the Event Data object passed to Stape's Data Tag."
+            "help": "Value of the identifier. This value must be the Click ID assigned to the user.\n\u003cbr/\u003e\nDefault: \u003cb\u003ecid\u003c/b\u003e URL param value previously saved to \u003cb\u003ewg_cid\u003c/b\u003e cookie, with fallback to \u003cb\u003ecommon_cookie.wg_cid\u003c/b\u003e in the Event Data object passed to Stape\u0027s Data Tag."
           },
           {
             "type": "TEXT",
@@ -231,6 +231,31 @@ ___TEMPLATE_PARAMETERS___
   },
   {
     "type": "GROUP",
+    "name": "tagExecutionConsentSettingsGroup",
+    "displayName": "Tag Execution Consent Settings",
+    "groupStyle": "ZIPPY_CLOSED",
+    "subParams": [
+      {
+        "type": "RADIO",
+        "name": "adStorageConsent",
+        "radioItems": [
+          {
+            "value": "optional",
+            "displayValue": "Send data always"
+          },
+          {
+            "value": "required",
+            "displayValue": "Send data in case marketing consent given",
+            "help": "Aborts the tag execution if marketing consent (\u003ci\u003ead_storage\u003c/i\u003e Google Consent Mode or Stape\u0027s Data Tag parameter) is not given."
+          }
+        ],
+        "simpleValueType": true,
+        "defaultValue": "optional"
+      }
+    ]
+  },
+  {
+    "type": "GROUP",
     "name": "logsGroup",
     "displayName": "Logs Settings",
     "groupStyle": "ZIPPY_CLOSED",
@@ -262,22 +287,29 @@ ___TEMPLATE_PARAMETERS___
 
 ___SANDBOXED_JS_FOR_SERVER___
 
-const setCookie = require('setCookie');
-const parseUrl = require('parseUrl');
-const getRequestHeader = require('getRequestHeader');
+const getAllEventData = require('getAllEventData');
+const getContainerVersion = require('getContainerVersion');
 const getCookieValues = require('getCookieValues');
+const getRequestHeader = require('getRequestHeader');
 const getType = require('getType');
-const makeTableMap = require('makeTableMap');
 const JSON = require('JSON');
 const logToConsole = require('logToConsole');
+const makeTableMap = require('makeTableMap');
+const parseUrl = require('parseUrl');
 const sendHttpRequest = require('sendHttpRequest');
-const getContainerVersion = require('getContainerVersion');
-const getAllEventData = require('getAllEventData');
+const setCookie = require('setCookie');
+
+/*==============================================================================
+==============================================================================*/
+const eventData = getAllEventData();
+
+if (!isConsentGivenOrNotRequired(data, eventData)) {
+  return data.gtmOnSuccess();
+}
 
 const isLoggingEnabled = determinateIsLoggingEnabled();
 const traceId = getRequestHeader('trace-id');
 
-const eventData = getAllEventData();
 const httpOnly = data.cookieHttpOnly;
 
 switch (data.type) {
@@ -290,6 +322,10 @@ switch (data.type) {
   default:
     data.gtmOnSuccess();
 }
+
+/*==============================================================================
+  Vendor related functions
+==============================================================================*/
 
 function handlePageViewEvent() {
   const url = eventData.page_location || getRequestHeader('referer');
@@ -312,10 +348,11 @@ function handlePageViewEvent() {
 
 function handleConversionEvent() {
   const commonCookie = eventData.common_cookie || {};
-  const clickId = data.clickId || getCookieValues('wg_cid')[0] || commonCookie.wg_cid;
-  
+  const clickId =
+    data.clickId || getCookieValues('wg_cid')[0] || commonCookie.wg_cid;
+
   if (!clickId) return data.gtmOnSuccess();
-  
+
   const payload = getRequestPayload(clickId);
   const requestUrl = 'https://api.webgains.io/queue-conversion';
   if (isLoggingEnabled) {
@@ -410,6 +447,17 @@ function getItems() {
 
 function getValueFromItems(items) {
   return items.reduce((acc, item) => acc + item.price, 0);
+}
+
+/*==============================================================================
+  Helpers
+==============================================================================*/
+
+function isConsentGivenOrNotRequired(data, eventData) {
+  if (data.adStorageConsent !== 'required') return true;
+  if (eventData.consent_state) return !!eventData.consent_state.ad_storage;
+  const xGaGcs = eventData['x-ga-gcs'] || ''; // x-ga-gcs is a string like "G110"
+  return xGaGcs[2] === '1';
 }
 
 function determinateIsLoggingEnabled() {
@@ -713,3 +761,5 @@ scenarios: []
 ___NOTES___
 
 Created on 25/03/2024, 15:44:08
+
+
