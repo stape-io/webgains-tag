@@ -1,5 +1,8 @@
 homepage: 'https://stape.io/'
+documentation: 'https://github.com/stape-io/webgains-tag'
 versions:
+  - sha: a718dd69c2c238a2b528f235693de0d182326e02
+    changeNotes: Add consent section.
   - sha: aae6f27d3c68566006541470708b65f877f55fdc
     changeNotes: Add common cookie support for Click ID cookie.
   - sha: 9617ec1416bb4c1181e0c587c1c5359dd757b126

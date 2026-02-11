@@ -1,19 +1,26 @@
-const setCookie = require('setCookie');
-const parseUrl = require('parseUrl');
-const getRequestHeader = require('getRequestHeader');
+const getAllEventData = require('getAllEventData');
+const getContainerVersion = require('getContainerVersion');
 const getCookieValues = require('getCookieValues');
+const getRequestHeader = require('getRequestHeader');
 const getType = require('getType');
-const makeTableMap = require('makeTableMap');
 const JSON = require('JSON');
 const logToConsole = require('logToConsole');
+const makeTableMap = require('makeTableMap');
+const parseUrl = require('parseUrl');
 const sendHttpRequest = require('sendHttpRequest');
-const getContainerVersion = require('getContainerVersion');
-const getAllEventData = require('getAllEventData');
+const setCookie = require('setCookie');
+
+/*==============================================================================
+==============================================================================*/
+const eventData = getAllEventData();
+
+if (!isConsentGivenOrNotRequired(data, eventData)) {
+  return data.gtmOnSuccess();
+}
 
 const isLoggingEnabled = determinateIsLoggingEnabled();
 const traceId = getRequestHeader('trace-id');
 
-const eventData = getAllEventData();
 const httpOnly = data.cookieHttpOnly;
 
 switch (data.type) {
@@ -26,6 +33,10 @@ switch (data.type) {
   default:
     data.gtmOnSuccess();
 }
+
+/*==============================================================================
+  Vendor related functions
+==============================================================================*/
 
 function handlePageViewEvent() {
   const url = eventData.page_location || getRequestHeader('referer');
@@ -48,10 +59,11 @@ function handlePageViewEvent() {
 
 function handleConversionEvent() {
   const commonCookie = eventData.common_cookie || {};
-  const clickId = data.clickId || getCookieValues('wg_cid')[0] || commonCookie.wg_cid;
-  
+  const clickId =
+    data.clickId || getCookieValues('wg_cid')[0] || commonCookie.wg_cid;
+
   if (!clickId) return data.gtmOnSuccess();
-  
+
   const payload = getRequestPayload(clickId);
   const requestUrl = 'https://api.webgains.io/queue-conversion';
   if (isLoggingEnabled) {
@@ -146,6 +158,17 @@ function getItems() {
 
 function getValueFromItems(items) {
   return items.reduce((acc, item) => acc + item.price, 0);
+}
+
+/*==============================================================================
+  Helpers
+==============================================================================*/
+
+function isConsentGivenOrNotRequired(data, eventData) {
+  if (data.adStorageConsent !== 'required') return true;
+  if (eventData.consent_state) return !!eventData.consent_state.ad_storage;
+  const xGaGcs = eventData['x-ga-gcs'] || ''; // x-ga-gcs is a string like "G110"
+  return xGaGcs[2] === '1';
 }
 
 function determinateIsLoggingEnabled() {
