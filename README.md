@@ -37,3 +37,6 @@ There are two types of events that Webgains tag supports: PageView and Conversio
 Webgains tag for GTM Server Side is developed and maintained by [Stape Team](https://stape.io/) under the Apache 2.0 license.
 
 Sponsored by [InBiz Online Marketing](https://www.inbiz.de?utm_source=github&utm_medium=wg-tag).
+
+### GTM Gallery Status
+🟢 [Listed](https://tagmanager.google.com/gallery/#/owners/stape-io/templates/webgains-tag)
