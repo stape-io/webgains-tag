@@ -14,6 +14,11 @@ ___INFO___
   "version": 1,
   "securityGroups": [],
   "displayName": "Webgains",
+  "categories": [
+    "AFFILIATE_MARKETING",
+    "ADVERTISING",
+    "CONVERSIONS"
+  ],
   "brand": {
     "id": "brand_dummy",
     "displayName": "stape-io",
@@ -301,6 +306,7 @@ const setCookie = require('setCookie');
 
 /*==============================================================================
 ==============================================================================*/
+
 const eventData = getAllEventData();
 
 if (!isConsentGivenOrNotRequired(data, eventData)) {
@@ -348,8 +354,7 @@ function handlePageViewEvent() {
 
 function handleConversionEvent() {
   const commonCookie = eventData.common_cookie || {};
-  const clickId =
-    data.clickId || getCookieValues('wg_cid')[0] || commonCookie.wg_cid;
+  const clickId = data.clickId || getCookieValues('wg_cid')[0] || commonCookie.wg_cid;
 
   if (!clickId) return data.gtmOnSuccess();
 
@@ -434,7 +439,7 @@ function getRequestPayload(clickId) {
 function getItems() {
   const items = data.items || eventData.items;
   if (getType(items) !== 'array') return [];
-  const itemFields = makeTableMap(data.itemFields, 'key', 'value') || {};
+  const itemFields = makeTableMap(data.itemFields || [], 'key', 'value') || {};
 
   return items.map((item) => ({
     event: item[itemFields.event || 'event'] || '',
@@ -760,6 +765,8 @@ scenarios: []
 
 ___NOTES___
 
+2026-05-08 - Change Notes:
+  - Add Community Template Gallery categories metadata (Affiliate Marketing, Advertising, Conversions) to improve template discoverability and classification.
+  - Make `itemFields` mapping resilient by defaulting to an empty table when the field is not configured, preventing mapping errors while preserving item parsing behavior.
+
 Created on 25/03/2024, 15:44:08
-
-

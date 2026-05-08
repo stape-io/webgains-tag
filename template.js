@@ -12,6 +12,7 @@ const setCookie = require('setCookie');
 
 /*==============================================================================
 ==============================================================================*/
+
 const eventData = getAllEventData();
 
 if (!isConsentGivenOrNotRequired(data, eventData)) {
@@ -59,8 +60,7 @@ function handlePageViewEvent() {
 
 function handleConversionEvent() {
   const commonCookie = eventData.common_cookie || {};
-  const clickId =
-    data.clickId || getCookieValues('wg_cid')[0] || commonCookie.wg_cid;
+  const clickId = data.clickId || getCookieValues('wg_cid')[0] || commonCookie.wg_cid;
 
   if (!clickId) return data.gtmOnSuccess();
 
@@ -145,7 +145,7 @@ function getRequestPayload(clickId) {
 function getItems() {
   const items = data.items || eventData.items;
   if (getType(items) !== 'array') return [];
-  const itemFields = makeTableMap(data.itemFields, 'key', 'value') || {};
+  const itemFields = makeTableMap(data.itemFields || [], 'key', 'value') || {};
 
   return items.map((item) => ({
     event: item[itemFields.event || 'event'] || '',
