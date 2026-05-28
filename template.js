@@ -1,10 +1,8 @@
 const getAllEventData = require('getAllEventData');
-const getContainerVersion = require('getContainerVersion');
 const getCookieValues = require('getCookieValues');
 const getRequestHeader = require('getRequestHeader');
 const getType = require('getType');
 const JSON = require('JSON');
-const logToConsole = require('logToConsole');
 const makeTableMap = require('makeTableMap');
 const parseUrl = require('parseUrl');
 const sendHttpRequest = require('sendHttpRequest');
@@ -18,9 +16,6 @@ const eventData = getAllEventData();
 if (!isConsentGivenOrNotRequired(data, eventData)) {
   return data.gtmOnSuccess();
 }
-
-const isLoggingEnabled = determinateIsLoggingEnabled();
-const traceId = getRequestHeader('trace-id');
 
 const httpOnly = data.cookieHttpOnly;
 
@@ -66,36 +61,9 @@ function handleConversionEvent() {
 
   const payload = getRequestPayload(clickId);
   const requestUrl = 'https://api.webgains.io/queue-conversion';
-  if (isLoggingEnabled) {
-    logToConsole(
-      JSON.stringify({
-        Name: 'Webgains',
-        Type: 'Request',
-        TraceId: traceId,
-        EventName: 'Conversion',
-        RequestMethod: 'POST',
-        RequestUrl: requestUrl,
-        RequestBody: payload
-      })
-    );
-  }
   sendHttpRequest(
     requestUrl,
     (statusCode, headers, body) => {
-      if (isLoggingEnabled) {
-        logToConsole(
-          JSON.stringify({
-            Name: 'Webgains',
-            Type: 'Response',
-            TraceId: traceId,
-            EventName: 'Conversion',
-            ResponseStatusCode: statusCode,
-            ResponseHeaders: headers,
-            ResponseBody: body
-          })
-        );
-      }
-
       if (statusCode >= 200 && statusCode < 300) {
         data.gtmOnSuccess();
       } else {
@@ -169,26 +137,4 @@ function isConsentGivenOrNotRequired(data, eventData) {
   if (eventData.consent_state) return !!eventData.consent_state.ad_storage;
   const xGaGcs = eventData['x-ga-gcs'] || ''; // x-ga-gcs is a string like "G110"
   return xGaGcs[2] === '1';
-}
-
-function determinateIsLoggingEnabled() {
-  const containerVersion = getContainerVersion();
-  const isDebug = !!(
-    containerVersion &&
-    (containerVersion.debugMode || containerVersion.previewMode)
-  );
-
-  if (!data.logType) {
-    return isDebug;
-  }
-
-  if (data.logType === 'no') {
-    return false;
-  }
-
-  if (data.logType === 'debug') {
-    return isDebug;
-  }
-
-  return data.logType === 'always';
 }
