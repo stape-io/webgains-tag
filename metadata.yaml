@@ -1,6 +1,8 @@
 homepage: 'https://stape.io/'
 documentation: 'https://github.com/stape-io/webgains-tag'
 versions:
+  - sha: 2643173a7a4d0d6b47b4d99c71c966353708c353
+    changeNotes: Logging removal.
   - sha: efd769374b11325a1361e33d5d1304a6cf91de0f
     changeNotes: Add fallback to makeTableMap when parsing data.itemFields to avoid exception.
   - sha: a718dd69c2c238a2b528f235693de0d182326e02
