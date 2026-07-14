@@ -172,8 +172,45 @@ ___TEMPLATE_PARAMETERS___
             "name": "items",
             "displayName": "Items",
             "simpleValueType": true,
-            "help": "Array with the articles of the transaction.\u003cbr /\u003eDefault: eventData.items",
+            "help": "Array with the articles of the transaction.\u003cbr /\u003eDefault: eventData.items \u003c/br\u003e\nThe Custom Data parameter must be a nested JSON object of key/value pairs as {\"color\": \"blue\", \"size\": \"M\"}",
             "valueValidators": []
+          },
+          {
+            "type": "CHECKBOX",
+            "name": "addOrderLevelCustomData",
+            "checkboxText": "Add Order Level Custom Data",
+            "simpleValueType": true,
+            "subParams": [
+              {
+                "type": "SIMPLE_TABLE",
+                "name": "orderLevelCustomData",
+                "displayName": "Custom Data",
+                "simpleTableColumns": [
+                  {
+                    "defaultValue": "",
+                    "displayName": "Parameter",
+                    "name": "key",
+                    "type": "TEXT"
+                  },
+                  {
+                    "defaultValue": "",
+                    "displayName": "Value",
+                    "name": "value",
+                    "type": "TEXT",
+                    "isUnique": true
+                  }
+                ],
+                "help": "Optional Custom Data to enhance the order data. \u003c/br\u003e  \nCheck the \u003ca href\u003d\"https://knowledgehub.webgains.com/home/server-to-server-tracking\"\u003edocumentation\u003c/a\u003e for more information.",
+                "newRowButtonText": "Add Parameter",
+                "enablingConditions": [
+                  {
+                    "paramName": "addOrderLevelCustomData",
+                    "paramValue": true,
+                    "type": "EQUALS"
+                  }
+                ]
+              }
+            ]
           },
           {
             "type": "SIMPLE_TABLE",
@@ -182,7 +219,7 @@ ___TEMPLATE_PARAMETERS___
             "simpleTableColumns": [
               {
                 "defaultValue": "event",
-                "displayName": "Filed",
+                "displayName": "Field",
                 "name": "key",
                 "type": "SELECT",
                 "selectItems": [
@@ -205,6 +242,10 @@ ___TEMPLATE_PARAMETERS___
                   {
                     "value": "voucher",
                     "displayValue": "voucher"
+                  },
+                  {
+                    "value": "customData",
+                    "displayValue": "custom data"
                   }
                 ],
                 "isUnique": true
@@ -221,7 +262,7 @@ ___TEMPLATE_PARAMETERS___
                 ]
               }
             ],
-            "help": "Default: \u003cbr /\u003e\n{  \u003cbr /\u003e\n\u0026nbsp;\u0026nbsp;event: item.event || \u0027\u0027,  \u003cbr /\u003e\n\u0026nbsp;\u0026nbsp;price: item.price || 0,  \u003cbr /\u003e\n\u0026nbsp;\u0026nbsp;name: item.item_name || \u0027\u0027,  \u003cbr /\u003e\n\u0026nbsp;\u0026nbsp;code: item.item_id || \u0027\u0027,  \u003cbr /\u003e\n\u0026nbsp;\u0026nbsp;voucher: item.voucher || \u0027\u0027  \u003cbr /\u003e\n}"
+            "help": "Default: \u003cbr /\u003e\n{  \u003cbr /\u003e\n\u0026nbsp;\u0026nbsp;event: item.event || \u0027\u0027,  \u003cbr /\u003e\n\u0026nbsp;\u0026nbsp;price: item.price || 0,  \u003cbr /\u003e\n\u0026nbsp;\u0026nbsp;name: item.item_name || \u0027\u0027,  \u003cbr /\u003e\n\u0026nbsp;\u0026nbsp;code: item.item_id || \u0027\u0027,  \u003cbr /\u003e\n\u0026nbsp;\u0026nbsp;voucher: item.voucher || \u0027\u0027  \u003cbr /\u003e\n\u0026nbsp;\u0026nbsp;customData: item.customData || {}\u003c/br\u003e\n}"
           }
         ]
       }
@@ -283,14 +324,12 @@ if (!isConsentGivenOrNotRequired(data, eventData)) {
   return data.gtmOnSuccess();
 }
 
-const httpOnly = data.cookieHttpOnly;
-
 switch (data.type) {
   case 'page_view':
-    handlePageViewEvent();
+    handlePageViewEvent(data, eventData);
     break;
   case 'conversion':
-    handleConversionEvent();
+    handleConversionEvent(data, eventData);
     break;
   default:
     data.gtmOnSuccess();
@@ -300,7 +339,8 @@ switch (data.type) {
   Vendor related functions
 ==============================================================================*/
 
-function handlePageViewEvent() {
+function handlePageViewEvent(data, eventData) {
+  const httpOnly = data.cookieHttpOnly;
   const url = eventData.page_location || getRequestHeader('referer');
   if (url) {
     const searchParams = parseUrl(url).searchParams;
@@ -319,13 +359,13 @@ function handlePageViewEvent() {
   data.gtmOnSuccess();
 }
 
-function handleConversionEvent() {
+function handleConversionEvent(data, eventData) {
   const commonCookie = eventData.common_cookie || {};
   const clickId = data.clickId || getCookieValues('wg_cid')[0] || commonCookie.wg_cid;
 
   if (!clickId) return data.gtmOnSuccess();
 
-  const payload = getRequestPayload(clickId);
+  const payload = getRequestPayload(data, clickId);
   const requestUrl = 'https://api.webgains.io/queue-conversion';
   sendHttpRequest(
     requestUrl,
@@ -341,7 +381,9 @@ function handleConversionEvent() {
   );
 }
 
-function getRequestPayload(clickId) {
+function getRequestPayload(data, clickId) {
+  const customDataArray = data.addOrderLevelCustomData ? data.orderLevelCustomData || [] : [];
+  const customData = makeTableMap(customDataArray, 'key', 'value');
   const items = getItems();
   const payload = {
     ids: [
@@ -373,6 +415,9 @@ function getRequestPayload(clickId) {
   if (data.customerId) payload.customerId = data.customerId;
   if (data.comment) payload.comment = data.comment;
 
+  if (customData && getType(customData) === 'object') {
+    payload.customData = customData;
+  }
   return payload;
 }
 
@@ -381,13 +426,17 @@ function getItems() {
   if (getType(items) !== 'array') return [];
   const itemFields = makeTableMap(data.itemFields || [], 'key', 'value') || {};
 
-  return items.map((item) => ({
-    event: item[itemFields.event || 'event'] || '',
-    price: item[itemFields.price || 'price'] || 0,
-    name: item[itemFields.name || 'item_name'] || '',
-    code: item[itemFields.code || 'item_id'] || '',
-    voucher: item[itemFields.voucher || 'voucher'] || ''
-  }));
+  return items.map((item) => {
+    const itemCustomData = item[itemFields.customData || 'customData'];
+    return {
+      event: item[itemFields.event || 'event'] || '',
+      price: item[itemFields.price || 'price'] || 0,
+      name: item[itemFields.name || 'item_name'] || '',
+      code: item[itemFields.code || 'item_id'] || '',
+      voucher: item[itemFields.voucher || 'voucher'] || '',
+      customData: itemCustomData
+    };
+  });
 }
 
 function getValueFromItems(items) {
@@ -648,4 +697,5 @@ ___NOTES___
   - Make `itemFields` mapping resilient by defaulting to an empty table when the field is not configured, preventing mapping errors while preserving item parsing behavior.
 
 Created on 25/03/2024, 15:44:08
+
 
