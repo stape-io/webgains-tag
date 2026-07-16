@@ -1,7 +1,7 @@
 homepage: 'https://stape.io/'
 documentation: 'https://github.com/stape-io/webgains-tag'
 versions:
-  - sha: ac6266f13dba774ae94d97c637eaf8a754e974ce
+  - sha: ec77b4e23620fe15c43682ec52dc65a178256fd5
     changeNotes: Add support to customData in payload.
   - sha: 2643173a7a4d0d6b47b4d99c71c966353708c353
     changeNotes: Logging removal.
