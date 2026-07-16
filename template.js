@@ -17,14 +17,12 @@ if (!isConsentGivenOrNotRequired(data, eventData)) {
   return data.gtmOnSuccess();
 }
 
-const httpOnly = data.cookieHttpOnly;
-
 switch (data.type) {
   case 'page_view':
-    handlePageViewEvent();
+    handlePageViewEvent(data, eventData);
     break;
   case 'conversion':
-    handleConversionEvent();
+    handleConversionEvent(data, eventData);
     break;
   default:
     data.gtmOnSuccess();
@@ -34,7 +32,8 @@ switch (data.type) {
   Vendor related functions
 ==============================================================================*/
 
-function handlePageViewEvent() {
+function handlePageViewEvent(data, eventData) {
+  const httpOnly = data.cookieHttpOnly;
   const url = eventData.page_location || getRequestHeader('referer');
   if (url) {
     const searchParams = parseUrl(url).searchParams;
@@ -53,13 +52,13 @@ function handlePageViewEvent() {
   data.gtmOnSuccess();
 }
 
-function handleConversionEvent() {
+function handleConversionEvent(data, eventData) {
   const commonCookie = eventData.common_cookie || {};
   const clickId = data.clickId || getCookieValues('wg_cid')[0] || commonCookie.wg_cid;
 
   if (!clickId) return data.gtmOnSuccess();
 
-  const payload = getRequestPayload(clickId);
+  const payload = getRequestPayload(data, clickId);
   const requestUrl = 'https://api.webgains.io/queue-conversion';
   sendHttpRequest(
     requestUrl,
@@ -75,7 +74,7 @@ function handleConversionEvent() {
   );
 }
 
-function getRequestPayload(clickId) {
+function getRequestPayload(data, clickId) {
   const items = getItems();
   const payload = {
     ids: [
@@ -107,6 +106,11 @@ function getRequestPayload(clickId) {
   if (data.customerId) payload.customerId = data.customerId;
   if (data.comment) payload.comment = data.comment;
 
+  const customDataArray = data.addOrderLevelCustomData ? data.orderLevelCustomData || [] : [];
+  const customData = makeTableMap(customDataArray, 'key', 'value');
+  if (getType(customData) === 'object') {
+    payload.customData = customData;
+  }
   return payload;
 }
 
@@ -115,13 +119,16 @@ function getItems() {
   if (getType(items) !== 'array') return [];
   const itemFields = makeTableMap(data.itemFields || [], 'key', 'value') || {};
 
-  return items.map((item) => ({
-    event: item[itemFields.event || 'event'] || '',
-    price: item[itemFields.price || 'price'] || 0,
-    name: item[itemFields.name || 'item_name'] || '',
-    code: item[itemFields.code || 'item_id'] || '',
-    voucher: item[itemFields.voucher || 'voucher'] || ''
-  }));
+  return items.map((item) => {
+    return {
+      event: item[itemFields.event || 'event'] || '',
+      price: item[itemFields.price || 'price'] || 0,
+      name: item[itemFields.name || 'item_name'] || '',
+      code: item[itemFields.code || 'item_id'] || '',
+      voucher: item[itemFields.voucher || 'voucher'] || '',
+      customData: item[itemFields.customData || 'customData']
+    };
+  });
 }
 
 function getValueFromItems(items) {
