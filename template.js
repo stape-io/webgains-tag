@@ -75,8 +75,6 @@ function handleConversionEvent(data, eventData) {
 }
 
 function getRequestPayload(data, clickId) {
-  const customDataArray = data.addOrderLevelCustomData ? data.orderLevelCustomData || [] : [];
-  const customData = makeTableMap(customDataArray, 'key', 'value');
   const items = getItems();
   const payload = {
     ids: [
@@ -108,7 +106,9 @@ function getRequestPayload(data, clickId) {
   if (data.customerId) payload.customerId = data.customerId;
   if (data.comment) payload.comment = data.comment;
 
-  if (customData && getType(customData) === 'object') {
+  const customDataArray = data.addOrderLevelCustomData ? data.orderLevelCustomData || [] : [];
+  const customData = makeTableMap(customDataArray, 'key', 'value');
+  if (getType(customData) === 'object') {
     payload.customData = customData;
   }
   return payload;
@@ -120,14 +120,13 @@ function getItems() {
   const itemFields = makeTableMap(data.itemFields || [], 'key', 'value') || {};
 
   return items.map((item) => {
-    const itemCustomData = item[itemFields.customData || 'customData'];
     return {
       event: item[itemFields.event || 'event'] || '',
       price: item[itemFields.price || 'price'] || 0,
       name: item[itemFields.name || 'item_name'] || '',
       code: item[itemFields.code || 'item_id'] || '',
       voucher: item[itemFields.voucher || 'voucher'] || '',
-      customData: itemCustomData
+      customData: item[itemFields.customData || 'customData']
     };
   });
 }

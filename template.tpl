@@ -190,14 +190,25 @@ ___TEMPLATE_PARAMETERS___
                     "defaultValue": "",
                     "displayName": "Parameter",
                     "name": "key",
-                    "type": "TEXT"
+                    "type": "TEXT",
+                    "isUnique": true,
+                    "valueValidators": [
+                      {
+                        "type": "NON_EMPTY"
+                      }
+                    ]
                   },
                   {
                     "defaultValue": "",
                     "displayName": "Value",
                     "name": "value",
                     "type": "TEXT",
-                    "isUnique": true
+                    "isUnique": false,
+                    "valueValidators": [
+                      {
+                        "type": "NON_EMPTY"
+                      }
+                    ]
                   }
                 ],
                 "help": "Optional Custom Data to enhance the order data. \u003c/br\u003e  \nCheck the \u003ca href\u003d\"https://knowledgehub.webgains.com/home/server-to-server-tracking\"\u003edocumentation\u003c/a\u003e for more information.",
@@ -262,7 +273,8 @@ ___TEMPLATE_PARAMETERS___
                 ]
               }
             ],
-            "help": "Default: \u003cbr /\u003e\n{  \u003cbr /\u003e\n\u0026nbsp;\u0026nbsp;event: item.event || \u0027\u0027,  \u003cbr /\u003e\n\u0026nbsp;\u0026nbsp;price: item.price || 0,  \u003cbr /\u003e\n\u0026nbsp;\u0026nbsp;name: item.item_name || \u0027\u0027,  \u003cbr /\u003e\n\u0026nbsp;\u0026nbsp;code: item.item_id || \u0027\u0027,  \u003cbr /\u003e\n\u0026nbsp;\u0026nbsp;voucher: item.voucher || \u0027\u0027  \u003cbr /\u003e\n\u0026nbsp;\u0026nbsp;customData: item.customData || {}\u003c/br\u003e\n}"
+            "help": "Default: \u003cbr /\u003e\n{  \u003cbr /\u003e\n\u0026nbsp;\u0026nbsp;event: item.event || \u0027\u0027,  \u003cbr /\u003e\n\u0026nbsp;\u0026nbsp;price: item.price || 0,  \u003cbr /\u003e\n\u0026nbsp;\u0026nbsp;name: item.item_name || \u0027\u0027,  \u003cbr /\u003e\n\u0026nbsp;\u0026nbsp;code: item.item_id || \u0027\u0027,  \u003cbr /\u003e\n\u0026nbsp;\u0026nbsp;voucher: item.voucher || \u0027\u0027  \u003cbr /\u003e\n\u0026nbsp;\u0026nbsp;customData: item.customData || {}\u003c/br\u003e\n}",
+            "newRowButtonText": "Add Parameter"
           }
         ]
       }
@@ -382,8 +394,6 @@ function handleConversionEvent(data, eventData) {
 }
 
 function getRequestPayload(data, clickId) {
-  const customDataArray = data.addOrderLevelCustomData ? data.orderLevelCustomData || [] : [];
-  const customData = makeTableMap(customDataArray, 'key', 'value');
   const items = getItems();
   const payload = {
     ids: [
@@ -415,7 +425,9 @@ function getRequestPayload(data, clickId) {
   if (data.customerId) payload.customerId = data.customerId;
   if (data.comment) payload.comment = data.comment;
 
-  if (customData && getType(customData) === 'object') {
+  const customDataArray = data.addOrderLevelCustomData ? data.orderLevelCustomData || [] : [];
+  const customData = makeTableMap(customDataArray, 'key', 'value');
+  if (getType(customData) === 'object') {
     payload.customData = customData;
   }
   return payload;
@@ -427,14 +439,13 @@ function getItems() {
   const itemFields = makeTableMap(data.itemFields || [], 'key', 'value') || {};
 
   return items.map((item) => {
-    const itemCustomData = item[itemFields.customData || 'customData'];
     return {
       event: item[itemFields.event || 'event'] || '',
       price: item[itemFields.price || 'price'] || 0,
       name: item[itemFields.name || 'item_name'] || '',
       code: item[itemFields.code || 'item_id'] || '',
       voucher: item[itemFields.voucher || 'voucher'] || '',
-      customData: itemCustomData
+      customData: item[itemFields.customData || 'customData']
     };
   });
 }
@@ -689,6 +700,9 @@ scenarios: []
 
 ___NOTES___
 
+2026-07-16 Change Notes:
+ - Add Custom Data support.
+
 2026-05-25 Change Notes:
  - Logging removal.
 
@@ -697,5 +711,4 @@ ___NOTES___
   - Make `itemFields` mapping resilient by defaulting to an empty table when the field is not configured, preventing mapping errors while preserving item parsing behavior.
 
 Created on 25/03/2024, 15:44:08
-
 
