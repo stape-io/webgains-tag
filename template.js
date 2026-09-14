@@ -37,7 +37,7 @@ function handlePageViewEvent(data, eventData) {
   const url = eventData.page_location || getRequestHeader('referer');
   if (url) {
     const searchParams = parseUrl(url).searchParams;
-    const cidParamName = data.cidQueryParameterName || 'cid';
+    const cidParamName = data.cidQueryParameterName || 'wgu';
     if (searchParams[cidParamName]) {
       const options = {
         domain: 'auto',
@@ -104,6 +104,7 @@ function getRequestPayload(data, clickId) {
   if (voucherId) payload.voucherId = voucherId;
 
   if (data.customerId) payload.customerId = data.customerId;
+  if (data.customerType) payload.customerType = data.customerType;
   if (data.comment) payload.comment = data.comment;
 
   const customDataArray = data.addOrderLevelCustomData ? data.orderLevelCustomData || [] : [];

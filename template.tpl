@@ -50,7 +50,7 @@ ___TEMPLATE_PARAMETERS___
     ],
     "simpleValueType": true,
     "defaultValue": "page_view",
-    "help": "\u003cb\u003ePageView\u003c/b\u003e - stores the \u003cb\u003e^^^cid^^^^\u003c/b\u003e query parameter inside the wg_cid cookie\u003cbr\u003e\u003cbr\u003e \u003cb\u003eConversion\u003c/b\u003e - Send request with data about the conversion to the Webgains"
+    "help": "\u003cb\u003ePageView\u003c/b\u003e - stores the click ID URL parameter (see \u003cb\u003eName of the Click URL parameter\u003c/b\u003e below, default \u003ci\u003ewgu\u003c/i\u003e) inside the \u003ci\u003ewg_cid\u003c/i\u003e cookie\n\u003cbr\u003e\u003cbr\u003e\n\u003cb\u003eConversion\u003c/b\u003e - send request with data about the conversion to the Webgains"
   },
   {
     "type": "GROUP",
@@ -59,14 +59,15 @@ ___TEMPLATE_PARAMETERS___
       {
         "type": "TEXT",
         "name": "cidQueryParameterName",
-        "displayName": "Name of the cid URL parameter",
+        "displayName": "Name of the Click URL parameter",
         "simpleValueType": true,
+        "help": "Name of the URL query parameter carrying the Webgains click ID.\u003cbr /\u003e Default: \u003ci\u003ewgu\u003c/i\u003e",
         "valueValidators": [
           {
             "type": "NON_EMPTY"
           }
         ],
-        "defaultValue": "cid"
+        "defaultValue": "wgu"
       },
       {
         "type": "CHECKBOX",
@@ -145,6 +146,13 @@ ___TEMPLATE_PARAMETERS___
             "displayName": "Customer ID",
             "simpleValueType": true,
             "help": "Customer ID, fill only on request.\u003cbr /\u003e Default: undefined"
+          },
+          {
+            "type": "TEXT",
+            "name": "customerType",
+            "displayName": "Customer Type",
+            "simpleValueType": true,
+            "help": "Customer type: \u003cb\u003enew\u003c/b\u003e, \u003cb\u003eexisting\u003c/b\u003e, or a custom value (e.g. \u003cb\u003etrial\u003c/b\u003e, \u003cb\u003esubscription\u003c/b\u003e)."
           },
           {
             "type": "TEXT",
@@ -356,7 +364,7 @@ function handlePageViewEvent(data, eventData) {
   const url = eventData.page_location || getRequestHeader('referer');
   if (url) {
     const searchParams = parseUrl(url).searchParams;
-    const cidParamName = data.cidQueryParameterName || 'cid';
+    const cidParamName = data.cidQueryParameterName || 'wgu';
     if (searchParams[cidParamName]) {
       const options = {
         domain: 'auto',
@@ -423,6 +431,7 @@ function getRequestPayload(data, clickId) {
   if (voucherId) payload.voucherId = voucherId;
 
   if (data.customerId) payload.customerId = data.customerId;
+  if (data.customerType) payload.customerType = data.customerType;
   if (data.comment) payload.comment = data.comment;
 
   const customDataArray = data.addOrderLevelCustomData ? data.orderLevelCustomData || [] : [];
@@ -695,10 +704,457 @@ ___SERVER_PERMISSIONS___
 
 ___TESTS___
 
-scenarios: []
+scenarios:
+- name: '[Page View] Sets wg_cid cookie using default or custom query parameter name'
+  code: |-
+    [
+      { paramName: undefined, url: 'https://example.com/checkout?wgu=click123', expectedValue: 'click123' },
+      { paramName: 'gclid', url: 'https://example.com/checkout?gclid=click456', expectedValue: 'click456' }
+    ].forEach((scenario) => {
+      cleanup();
+      const copyMockData = createMockData();
+      copyMockData.type = 'page_view';
+      copyMockData.cidQueryParameterName = scenario.paramName;
+
+      mock('getAllEventData', () => ({ page_location: scenario.url }));
+      mock('setCookie', (name, value, options) => {
+        assertThat(name).isEqualTo('wg_cid');
+        assertThat(value).isEqualTo(scenario.expectedValue);
+        assertThat(options.domain).isEqualTo('auto');
+        assertThat(options.path).isEqualTo('/');
+        assertThat(options.secure).isTrue();
+        assertThat(options['max-age']).isEqualTo(7776000);
+      });
+
+      runCode(copyMockData);
+
+      assertApi('setCookie').wasCalled();
+      assertApi('gtmOnSuccess').wasCalled();
+      assertApi('gtmOnFailure').wasNotCalled();
+    });
+- name: '[Page View] Falls back to referer header when page location is absent'
+  code: |-
+    mockData.type = 'page_view';
+
+    mock('getAllEventData', () => ({}));
+    mock('getRequestHeader', (header) => {
+      if (header === 'referer') return 'https://example.com/checkout?wgu=refClick';
+    });
+    mock('setCookie', (name, value) => {
+      assertThat(name).isEqualTo('wg_cid');
+      assertThat(value).isEqualTo('refClick');
+    });
+
+    runCode(mockData);
+
+    assertApi('setCookie').wasCalled();
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+- name: '[Page View] Does not set cookie when cid parameter is missing from URL'
+  code: |-
+    mockData.type = 'page_view';
+
+    mock('getAllEventData', () => ({ page_location: 'https://example.com/checkout' }));
+    mock('setCookie', () => {});
+
+    runCode(mockData);
+
+    assertApi('setCookie').wasNotCalled();
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+- name: '[Page View] Passes cookieHttpOnly option through to the cookie'
+  code: |-
+    [true, false].forEach((httpOnlyValue) => {
+      cleanup();
+      const copyMockData = createMockData();
+      copyMockData.type = 'page_view';
+      copyMockData.cookieHttpOnly = httpOnlyValue;
+
+      mock('getAllEventData', () => ({ page_location: 'https://example.com/checkout?wgu=click789' }));
+      mock('setCookie', (name, value, options) => {
+        assertThat(options.httpOnly).isEqualTo(httpOnlyValue);
+      });
+
+      runCode(copyMockData);
+
+      assertApi('setCookie').wasCalled();
+      assertApi('gtmOnSuccess').wasCalled();
+    });
+- name: '[Consent] Denied via x-ga-gcs stops the conversion request'
+  code: |-
+    mockData.type = 'conversion';
+    mockData.clickId = 'c1';
+    mockData.adStorageConsent = 'required';
+
+    mock('getAllEventData', () => ({ 'x-ga-gcs': 'G100' }));
+
+    runCode(mockData);
+
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+    assertApi('sendHttpRequest').wasNotCalled();
+- name: '[Consent] Denied via x-ga-gcs also blocks the page view cookie'
+  code: |-
+    mockData.type = 'page_view';
+    mockData.adStorageConsent = 'required';
+
+    mock('getAllEventData', () => ({ page_location: 'https://example.com/checkout?wgu=click123', 'x-ga-gcs': 'G100' }));
+
+    runCode(mockData);
+
+    assertApi('setCookie').wasNotCalled();
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+- name: '[Consent] Granted via x-ga-gcs or consent_state allows the conversion request'
+  code: |-
+    [
+      { getAllEventData: () => ({ 'x-ga-gcs': 'G110' }) },
+      { getAllEventData: () => ({ consent_state: { ad_storage: true } }) }
+    ].forEach((scenario) => {
+      cleanup();
+      const copyMockData = createMockData();
+      copyMockData.type = 'conversion';
+      copyMockData.clickId = 'c1';
+      copyMockData.adStorageConsent = 'required';
+
+      mock('getAllEventData', scenario.getAllEventData);
+      mock('sendHttpRequest', (url, callback) => callback(200, {}, ''));
+
+      runCode(copyMockData);
+
+      assertApi('sendHttpRequest').wasCalled();
+      assertApi('gtmOnSuccess').wasCalled();
+      assertApi('gtmOnFailure').wasNotCalled();
+    });
+- name: '[Consent] Optional by default allows the conversion request without consent
+    signals'
+  code: |-
+    mockData.type = 'conversion';
+    mockData.clickId = 'c1';
+
+    mock('getAllEventData', () => ({}));
+    mock('sendHttpRequest', (url, callback) => callback(200, {}, ''));
+
+    runCode(mockData);
+
+    assertApi('sendHttpRequest').wasCalled();
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+- name: '[Early Exit] Calls gtmOnSuccess without sending a request when click id is
+    missing'
+  code: |-
+    mockData.type = 'conversion';
+    mockData.clickId = undefined;
+
+    mock('getAllEventData', () => ({}));
+    mock('getCookieValues', () => []);
+
+    runCode(mockData);
+
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+    assertApi('sendHttpRequest').wasNotCalled();
+- name: '[Click Id] Resolves from data field cookie or common cookie in priority order'
+  code: |-
+    [
+      { dataClickId: 'dataClick', cookieValues: ['cookieClick'], commonCookie: { wg_cid: 'commonClick' }, expected: 'dataClick' },
+      { dataClickId: undefined, cookieValues: ['cookieClick'], commonCookie: { wg_cid: 'commonClick' }, expected: 'cookieClick' },
+      { dataClickId: undefined, cookieValues: [], commonCookie: { wg_cid: 'commonClick' }, expected: 'commonClick' }
+    ].forEach((scenario) => {
+      cleanup();
+      const copyMockData = createMockData();
+      copyMockData.type = 'conversion';
+      copyMockData.clickId = scenario.dataClickId;
+
+      mock('getAllEventData', () => ({ common_cookie: scenario.commonCookie }));
+      mock('getCookieValues', (name) => {
+        if (name === 'wg_cid') return scenario.cookieValues;
+        return [];
+      });
+      mock('sendHttpRequest', (url, callback, options, body) => {
+        const parsedBody = JSON.parse(body);
+        assertThat(parsedBody.ids[0].value).isEqualTo(scenario.expected);
+        callback(200, {}, '');
+      });
+
+      runCode(copyMockData);
+
+      assertApi('gtmOnSuccess').wasCalled();
+    });
+- name: '[Request Payload] Maps all provided fields including custom data and item
+    totals'
+  code: |-
+    mockData.type = 'conversion';
+    mockData.clickId = 'clickABC';
+    mockData.programId = '312042';
+    mockData.location = 'https://example.com/checkout';
+    mockData.orderReference = 'ORD1';
+    mockData.eventId = 'EVT1';
+    mockData.currency = 'GBP';
+    mockData.voucherId = 'DISCOUNT10';
+    mockData.customerId = 'CUST1';
+    mockData.customerType = 'existing';
+    mockData.comment = 'Test comment';
+    mockData.items = [
+      { event: 'purchase', price: 25, item_name: 'Widget', item_id: 'W1', voucher: 'SAVE10', customData: { color: 'red' } },
+      { event: 'purchase', price: 15, item_name: 'Gadget', item_id: 'G1', voucher: '' }
+    ];
+    mockData.addOrderLevelCustomData = true;
+    mockData.orderLevelCustomData = [
+      { key: 'membershipTier', value: 'Gold' },
+      { key: 'color', value: 'blue' }
+    ];
+
+    mock('getAllEventData', () => ({}));
+    mock('sendHttpRequest', (url, callback, options, body) => {
+      assertThat(url).isEqualTo('https://api.webgains.io/queue-conversion');
+      assertThat(options.method).isEqualTo('POST');
+      assertThat(options.headers['content-type']).isEqualTo('application/json');
+
+      const parsedBody = JSON.parse(body);
+      assertThat(parsedBody).isEqualTo({
+        ids: [{ name: 's2s', value: 'clickABC' }],
+        value: 40,
+        items: [
+          { event: 'purchase', price: 25, name: 'Widget', code: 'W1', voucher: 'SAVE10', customData: { color: 'red' } },
+          { event: 'purchase', price: 15, name: 'Gadget', code: 'G1', voucher: '' }
+        ],
+        programId: '312042',
+        location: 'https://example.com/checkout',
+        orderReference: 'ORD1',
+        eventId: 'EVT1',
+        currency: 'GBP',
+        voucherId: 'DISCOUNT10',
+        customerId: 'CUST1',
+        customerType: 'existing',
+        comment: 'Test comment',
+        customData: { membershipTier: 'Gold', color: 'blue' }
+      });
+
+      callback(200, {}, '');
+    });
+
+    runCode(mockData);
+
+    assertApi('sendHttpRequest').wasCalled();
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+- name: '[Request Payload] Falls back to eventData fields and omits unset optional
+    fields'
+  code: |-
+    mockData.type = 'conversion';
+    mockData.clickId = 'clickXYZ';
+
+    mock('getAllEventData', () => ({
+      page_location: 'https://example.com/eventdata-checkout',
+      transaction_id: 'EDTX1',
+      event_id: 'EDEVT1',
+      currency: 'USD',
+      coupon: 'EDCOUPON'
+    }));
+    mock('sendHttpRequest', (url, callback, options, body) => {
+      const parsedBody = JSON.parse(body);
+      assertThat(parsedBody.location).isEqualTo('https://example.com/eventdata-checkout');
+      assertThat(parsedBody.orderReference).isEqualTo('EDTX1');
+      assertThat(parsedBody.eventId).isEqualTo('EDEVT1');
+      assertThat(parsedBody.currency).isEqualTo('USD');
+      assertThat(parsedBody.voucherId).isEqualTo('EDCOUPON');
+      assertThat(parsedBody.customerId).isUndefined();
+      assertThat(parsedBody.customerType).isUndefined();
+      assertThat(parsedBody.comment).isUndefined();
+      assertThat(parsedBody.items).isEqualTo([]);
+      assertThat(parsedBody.value).isEqualTo(0);
+      callback(200, {}, '');
+    });
+
+    runCode(mockData);
+
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+- name: '[Order Level Custom Data] Merges key value rows into a single object'
+  code: |-
+    mockData.type = 'conversion';
+    mockData.clickId = 'c1';
+    mockData.addOrderLevelCustomData = true;
+    mockData.orderLevelCustomData = [
+      { key: 'color', value: 'blue' },
+      { key: 'size', value: 'M' }
+    ];
+
+    mock('getAllEventData', () => ({}));
+    mock('sendHttpRequest', (url, callback, options, body) => {
+      const parsedBody = JSON.parse(body);
+      assertThat(parsedBody.customData).isEqualTo({ color: 'blue', size: 'M' });
+      callback(200, {}, '');
+    });
+
+    runCode(mockData);
+
+    assertApi('gtmOnSuccess').wasCalled();
+- name: '[Items] Maps fields using default and custom itemFields configuration'
+  code: |-
+    [
+      {
+        itemFields: [],
+        item: { event: 'purchase', price: 30, item_name: 'Default Item', item_id: 'D1', voucher: 'V1' },
+        expected: { event: 'purchase', price: 30, name: 'Default Item', code: 'D1', voucher: 'V1' }
+      },
+      {
+        itemFields: [
+          { key: 'event', value: 'evt' },
+          { key: 'price', value: 'amount' },
+          { key: 'name', value: 'title' },
+          { key: 'code', value: 'sku' },
+          { key: 'voucher', value: 'promo' }
+        ],
+        item: { evt: 'purchase', amount: 45, title: 'Custom Item', sku: 'C1', promo: 'PROMO5' },
+        expected: { event: 'purchase', price: 45, name: 'Custom Item', code: 'C1', voucher: 'PROMO5' }
+      }
+    ].forEach((scenario) => {
+      cleanup();
+      const copyMockData = createMockData();
+      copyMockData.type = 'conversion';
+      copyMockData.clickId = 'c1';
+      copyMockData.itemFields = scenario.itemFields;
+      copyMockData.items = [scenario.item];
+
+      mock('getAllEventData', () => ({}));
+      mock('sendHttpRequest', (url, callback, options, body) => {
+        const parsedBody = JSON.parse(body);
+        assertThat(parsedBody.items).isEqualTo([scenario.expected]);
+        callback(200, {}, '');
+      });
+
+      runCode(copyMockData);
+
+      assertApi('gtmOnSuccess').wasCalled();
+    });
+- name: '[Items] Falls back to eventData items and returns empty array when items
+    are missing'
+  code: |-
+    [
+      {
+        dataItems: undefined,
+        eventDataItems: [{ event: 'purchase', price: 10, item_name: 'Event Item', item_id: 'E1', voucher: '' }],
+        expectedItems: [{ event: 'purchase', price: 10, name: 'Event Item', code: 'E1', voucher: '' }],
+        expectedValue: 10
+      },
+      { dataItems: undefined, eventDataItems: undefined, expectedItems: [], expectedValue: 0 }
+    ].forEach((scenario) => {
+      cleanup();
+      const copyMockData = createMockData();
+      copyMockData.type = 'conversion';
+      copyMockData.clickId = 'c1';
+      copyMockData.items = scenario.dataItems;
+
+      mock('getAllEventData', () => ({ items: scenario.eventDataItems }));
+      mock('sendHttpRequest', (url, callback, options, body) => {
+        const parsedBody = JSON.parse(body);
+        assertThat(parsedBody.items).isEqualTo(scenario.expectedItems);
+        assertThat(parsedBody.value).isEqualTo(scenario.expectedValue);
+        callback(200, {}, '');
+      });
+
+      runCode(copyMockData);
+
+      assertApi('gtmOnSuccess').wasCalled();
+    });
+- name: '[Item Custom Data] Passed through as configured without validation'
+  code: |-
+    [
+      { customData: { color: 'red' } },
+      { customData: [{ color: 'red' }, { size: 'M' }] },
+      { customData: 'red' },
+      { customData: undefined }
+    ].forEach((scenario) => {
+      cleanup();
+      const copyMockData = createMockData();
+      copyMockData.type = 'conversion';
+      copyMockData.clickId = 'c1';
+      copyMockData.items = [{ event: 'purchase', price: 5, item_name: 'Item', item_id: 'I1', voucher: '', customData: scenario.customData }];
+
+      mock('getAllEventData', () => ({}));
+      mock('sendHttpRequest', (url, callback, options, body) => {
+        const parsedBody = JSON.parse(body);
+        if (scenario.customData === undefined) {
+          assertThat(parsedBody.items[0].customData).isUndefined();
+        } else {
+          assertThat(parsedBody.items[0].customData).isEqualTo(scenario.customData);
+        }
+        callback(200, {}, '');
+      });
+
+      runCode(copyMockData);
+
+      assertApi('gtmOnSuccess').wasCalled();
+    });
+- name: '[HTTP Response] Calls gtmOnFailure when the response status is not 2xx'
+  code: |-
+    mockData.type = 'conversion';
+    mockData.clickId = 'c1';
+
+    mock('getAllEventData', () => ({}));
+    mock('sendHttpRequest', (url, callback) => callback(500, {}, ''));
+
+    runCode(mockData);
+
+    assertApi('sendHttpRequest').wasCalled();
+    assertApi('gtmOnSuccess').wasNotCalled();
+    assertApi('gtmOnFailure').wasCalled();
+- name: '[Type] Unknown event type calls gtmOnSuccess directly without further processing'
+  code: |-
+    mockData.type = 'something_else';
+
+    mock('getAllEventData', () => ({}));
+
+    runCode(mockData);
+
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+    assertApi('sendHttpRequest').wasNotCalled();
+    assertApi('setCookie').wasNotCalled();
+setup: |-
+  const JSON = require('JSON');
+
+  const cleanup = () => {
+    mock('getAllEventData', () => ({}));
+    mock('getCookieValues', () => []);
+    mock('getRequestHeader', () => undefined);
+    mock('setCookie', () => {});
+    mock('sendHttpRequest', (url, callback) => callback(200, {}, ''));
+  };
+  cleanup();
+
+  const createMockData = () => ({
+    type: 'conversion',
+    programId: '312042',
+    clickId: undefined,
+    cookieHttpOnly: false,
+    cidQueryParameterName: undefined,
+    orderReference: undefined,
+    eventId: undefined,
+    currency: undefined,
+    voucherId: undefined,
+    customerId: undefined,
+    customerType: undefined,
+    location: undefined,
+    comment: undefined,
+    items: undefined,
+    itemFields: [],
+    addOrderLevelCustomData: false,
+    orderLevelCustomData: [],
+    adStorageConsent: 'optional'
+  });
+
+  const mockData = createMockData();
 
 
 ___NOTES___
+
+2026-09-14 - Change Notes:
+  - Add a Customer Type field, sent as customerType in the conversion payload per Webgains' documented format.
+  - Default the click ID URL parameter to wgu (Webgains' documented default) instead of cid, and update the Event Type and cid parameter name help text to match.
+  - Add unit test coverage for page view cookie handling, consent gating, click ID resolution, request payload mapping (including the new Customer Type field), order/item custom data, and HTTP response handling.
 
 2026-07-16 Change Notes:
  - Add Custom Data support.
